@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tablero EPH — Gran Río Cuarto</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6; /* Río Cuarto */
+    --series-2:       #eb6834; /* Gran Córdoba */
+    --neutral-bar:    #d8d6cd; /* resto de aglomerados */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --series-1:       #3987e5;
+      --series-2:       #d95926;
+      --neutral-bar:    #3a3a37;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  header.page-header { margin-bottom: 28px; }
+  header.page-header h1 { font-size: 24px; margin: 0 0 4px; }
+  .subtitle { color: var(--text-secondary); font-size: 14px; margin: 0; }
+  .badge {
+    display: inline-block; margin-top: 10px; padding: 4px 10px;
+    border-radius: 999px; background: var(--surface-1); border: 1px solid var(--border);
+    color: var(--text-secondary); font-size: 12px;
+  }
+
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+  }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .kpi-row .card { text-align: left; }
+  .kpi-label { font-size: 13px; color: var(--text-secondary); margin: 0 0 8px; }
+  .kpi-value { font-size: 34px; font-weight: 600; margin: 0; line-height: 1; }
+  .kpi-ref { font-size: 12px; color: var(--text-muted); margin: 8px 0 0; }
+
+  .chart-card { margin-bottom: 20px; }
+  .chart-head {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 18px;
+  }
+  .chart-head h2 { font-size: 16px; margin: 0; }
+  select {
+    font: inherit; font-size: 13px; color: var(--text-primary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px;
+  }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--text-secondary); margin-bottom: 14px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .swatch.line { width: 14px; height: 0; border-top: 2px dashed var(--text-muted); border-radius: 0; }
+
+  .bars { display: flex; flex-direction: column; }
+  .bar-row {
+    display: grid; grid-template-columns: 150px 1fr 56px; align-items: center;
+    gap: 10px; padding: 3px 0;
+  }
+  .bar-name { font-size: 12.5px; color: var(--text-secondary); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-name.highlight { color: var(--text-primary); font-weight: 600; }
+  .bar-track { position: relative; height: 16px; background: transparent; }
+  .bar-fill {
+    position: absolute; top: 2px; bottom: 2px; left: 0;
+    border-radius: 4px; background: var(--neutral-bar);
+    transition: filter 0.1s ease;
+  }
+  .bar-fill.s1 { background: var(--series-1); }
+  .bar-fill.s2 { background: var(--series-2); }
+  .bar-row:hover .bar-fill { filter: brightness(0.92); }
+  .bar-value { font-size: 12.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .bar-value.highlight { color: var(--text-primary); font-weight: 600; }
+
+  .ref-line {
+    position: absolute; top: -4px; bottom: -4px; width: 0;
+    border-left: 2px dashed var(--text-muted);
+  }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 10;
+    background: var(--text-primary); color: var(--surface-1);
+    font-size: 12px; padding: 6px 10px; border-radius: 6px;
+    transform: translate(-50%, -120%); white-space: nowrap; opacity: 0;
+    transition: opacity 0.08s ease;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip strong { font-variant-numeric: tabular-nums; }
+
+  .table-toggle {
+    background: none; border: none; color: var(--text-secondary);
+    font-size: 12px; text-decoration: underline; cursor: pointer; padding: 0;
+    margin-top: 10px;
+  }
+  table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 14px; display: none; }
+  table.data-table.show { display: table; }
+  table.data-table th, table.data-table td {
+    text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--gridline);
+  }
+  table.data-table td:last-child, table.data-table th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .notes { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; margin-top: 32px; }
+  .notes p { margin: 0 0 8px; }
+
+  .status { padding: 40px 0; color: var(--text-secondary); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page-header">
+    <h1>Tablero EPH — Gran Río Cuarto</h1>
+    <p class="subtitle">Encuesta Permanente de Hogares (INDEC) · Aglomerado Gran Río Cuarto (código 36)</p>
+    <span class="badge" id="periodo-badge">cargando período…</span>
+  </header>
+
+  <div id="status" class="status">Cargando datos…</div>
+
+  <div id="contenido" hidden>
+
+    <section class="kpi-row" id="kpi-row"></section>
+
+    <section class="card chart-card">
+      <div class="chart-head">
+        <h2>Comparación entre aglomerados</h2>
+        <select id="indicador-select">
+          <option value="tasa_actividad">Tasa de actividad</option>
+          <option value="tasa_empleo">Tasa de empleo</option>
+          <option value="tasa_desocupacion" selected>Tasa de desocupación</option>
+        </select>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--series-1)"></i> Río Cuarto</span>
+        <span><i class="swatch" style="background:var(--series-2)"></i> Gran Córdoba</span>
+        <span><i class="swatch" style="background:var(--neutral-bar)"></i> Resto de aglomerados</span>
+        <span><i class="swatch line"></i> Total país</span>
+      </div>
+      <div class="bars" id="bars"></div>
+      <button class="table-toggle" id="table-toggle">Ver como tabla</button>
+      <table class="data-table" id="data-table">
+        <thead><tr><th>Aglomerado</th><th id="table-value-header">Tasa de desocupación</th></tr></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </section>
+
+  </div>
+
+  <div class="notes">
+    <p><strong>Nota metodológica:</strong> esta es una primera prueba del tablero, con un solo indicador (mercado de trabajo) y un solo trimestre cargado. Faltan sumar población, educación, vivienda, ingresos, y series históricas.</p>
+    <p>"Total país" es un cálculo propio (misma fórmula aplicada sin filtrar aglomerado), no la cifra oficial que publica INDEC — se usa así para que la comparación sea metodológicamente consistente con cada aglomerado. En Gran Río Cuarto, al ser un aglomerado más chico, las tasas trimestrales tienen mayor variabilidad muestral que en aglomerados grandes.</p>
+  </div>
+
+</div>
+
+<div class="tooltip" id="tooltip" role="tooltip"></div>
+
+<script>
+(function () {
+  const INDICADORES = {
+    tasa_actividad:    "Tasa de actividad",
+    tasa_empleo:       "Tasa de empleo",
+    tasa_desocupacion: "Tasa de desocupación"
+  };
+
+  const statusEl = document.getElementById('status');
+  const contenidoEl = document.getElementById('contenido');
+  const periodoBadge = document.getElementById('periodo-badge');
+  const kpiRow = document.getElementById('kpi-row');
+  const barsEl = document.getElementById('bars');
+  const select = document.getElementById('indicador-select');
+  const tooltip = document.getElementById('tooltip');
+  const tableToggle = document.getElementById('table-toggle');
+  const dataTable = document.getElementById('data-table');
+  const tableBody = document.getElementById('table-body');
+  const tableHeader = document.getElementById('table-value-header');
+
+  let filas = [];
+
+  fetch('./data/indicadores_comparacion.json')
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(data => {
+      filas = Array.isArray(data) ? data : [];
+      if (filas.length === 0) throw new Error('El archivo de datos está vacío.');
+      render();
+    })
+    .catch(err => {
+      statusEl.textContent = 'No se pudo cargar data/indicadores_comparacion.json (' + err.message + '). ' +
+        'Si estás viendo este archivo abierto directamente desde tu computadora, esto es esperable: el fetch() ' +
+        'necesita que el archivo se sirva por HTTP, así que solo funciona una vez publicado en GitHub Pages ' +
+        '(o corriendo un servidor local).';
+    });
+
+  function ultimoPeriodo(filas) {
+    return filas.reduce((max, f) => {
+      const clave = f.anio * 10 + f.trimestre;
+      return clave > max.clave ? { clave, anio: f.anio, trimestre: f.trimestre } : max;
+    }, { clave: -1, anio: null, trimestre: null });
+  }
+
+  function render() {
+    const periodo = ultimoPeriodo(filas);
+    const filasPeriodo = filas.filter(f => f.anio === periodo.anio && f.trimestre === periodo.trimestre);
+
+    periodoBadge.textContent = periodo.anio + ' · ' + periodo.trimestre + 'er trimestre';
+
+    const rioCuarto = filasPeriodo.find(f => f.entidad === 'Rio Cuarto');
+    const totalPais = filasPeriodo.find(f => f.entidad === 'Total pais');
+    const aglomerados = filasPeriodo.filter(f => f.entidad !== 'Total pais');
+
+    renderKpis(rioCuarto, totalPais);
+    renderBars(aglomerados, totalPais, select.value);
+
+    select.addEventListener('change', () => renderBars(aglomerados, totalPais, select.value));
+    tableToggle.addEventListener('click', () => {
+      const showing = dataTable.classList.toggle('show');
+      tableToggle.textContent = showing ? 'Ocultar tabla' : 'Ver como tabla';
+    });
+
+    statusEl.hidden = true;
+    contenidoEl.hidden = false;
+  }
+
+  function fmt(v) {
+    return (v === undefined || v === null || Number.isNaN(v)) ? '—' : v.toFixed(1) + '%';
+  }
+
+  function renderKpis(rioCuarto, totalPais) {
+    kpiRow.innerHTML = '';
+    Object.keys(INDICADORES).forEach(key => {
+      const div = document.createElement('div');
+      div.className = 'card';
+      const label = document.createElement('p');
+      label.className = 'kpi-label';
+      label.textContent = INDICADORES[key];
+      const value = document.createElement('p');
+      value.className = 'kpi-value';
+      value.textContent = fmt(rioCuarto ? rioCuarto[key] : null);
+      const ref = document.createElement('p');
+      ref.className = 'kpi-ref';
+      ref.textContent = 'Total país: ' + fmt(totalPais ? totalPais[key] : null);
+      div.append(label, value, ref);
+      kpiRow.appendChild(div);
+    });
+  }
+
+  function renderBars(aglomerados, totalPais, indicador) {
+    tableHeader.textContent = INDICADORES[indicador];
+    const ordenados = aglomerados
+      .filter(f => typeof f[indicador] === 'number' && !Number.isNaN(f[indicador]))
+      .sort((a, b) => b[indicador] - a[indicador]);
+
+    const max = Math.max(
+      ...ordenados.map(f => f[indicador]),
+      totalPais ? totalPais[indicador] : 0
+    ) * 1.05;
+
+    barsEl.innerHTML = '';
+    tableBody.innerHTML = '';
+
+    ordenados.forEach(f => {
+      const esRioCuarto = f.entidad === 'Rio Cuarto';
+      const esGranCordoba = f.entidad === 'Gran Cordoba';
+      const highlight = esRioCuarto || esGranCordoba;
+      const pct = (f[indicador] / max) * 100;
+
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+
+      const name = document.createElement('div');
+      name.className = 'bar-name' + (highlight ? ' highlight' : '');
+      name.textContent = f.entidad;
+
+      const track = document.createElement('div');
+      track.className = 'bar-track';
+
+      const fill = document.createElement('div');
+      fill.className = 'bar-fill' + (esRioCuarto ? ' s1' : esGranCordoba ? ' s2' : '');
+      fill.style.width = pct + '%';
+
+      if (totalPais && typeof totalPais[indicador] === 'number') {
+        const refLine = document.createElement('div');
+        refLine.className = 'ref-line';
+        refLine.style.left = ((totalPais[indicador] / max) * 100) + '%';
+        track.appendChild(refLine);
+      }
+      track.appendChild(fill);
+
+      const value = document.createElement('div');
+      value.className = 'bar-value' + (highlight ? ' highlight' : '');
+      value.textContent = fmt(f[indicador]);
+
+      row.addEventListener('pointermove', (e) => showTooltip(e, f.entidad, f[indicador]));
+      row.addEventListener('pointerleave', hideTooltip);
+      row.addEventListener('focus', (e) => showTooltip(e, f.entidad, f[indicador]));
+      row.tabIndex = 0;
+
+      row.append(name, track, value);
+      barsEl.appendChild(row);
+
+      const tr = document.createElement('tr');
+      const tdName = document.createElement('td');
+      tdName.textContent = f.entidad;
+      const tdValue = document.createElement('td');
+      tdValue.textContent = fmt(f[indicador]);
+      tr.append(tdName, tdValue);
+      tableBody.appendChild(tr);
+    });
+  }
+
+  function showTooltip(e, nombre, valor) {
+    tooltip.innerHTML = '';
+    tooltip.appendChild(document.createTextNode(nombre + ': '));
+    const strong = document.createElement('strong');
+    strong.textContent = fmt(valor);
+    tooltip.appendChild(strong);
+    tooltip.style.left = e.clientX + 'px';
+    tooltip.style.top = e.clientY + 'px';
+    tooltip.classList.add('show');
+  }
+  function hideTooltip() {
+    tooltip.classList.remove('show');
+  }
+})();
+</script>
+</body>
+</html>
