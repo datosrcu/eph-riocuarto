@@ -1,0 +1,9 @@
+# Archivos de R que no hace falta versionar
+.Rhistory
+.RData
+.Rproj.user/
+
+# Por las dudas: nunca versionar microdatos crudos si algún día
+# terminan en esta carpeta por error (deberían vivir solo en Dropbox)
+*.txt
+old/
